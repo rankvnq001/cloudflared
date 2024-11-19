@@ -226,7 +226,7 @@ type icmpProxy struct {
 	encoderPool sync.Pool
 }
 
-func newICMPProxy(listenIP netip.Addr, zone string, logger *zerolog.Logger, idleTimeout time.Duration) (*icmpProxy, error) {
+func newICMPProxy(listenIP netip.Addr, logger *zerolog.Logger, idleTimeout time.Duration) (*icmpProxy, error) {
 	var (
 		srcSocketAddr *sockAddrIn6
 		handle        uintptr
@@ -267,15 +267,15 @@ func (ip *icmpProxy) Serve(ctx context.Context) error {
 // Request sends an ICMP echo request and wait for a reply or timeout.
 // The async version of Win32 APIs take a callback whose memory is not garbage collected, so we use the synchronous version.
 // It's possible that a slow request will block other requests, so we set the timeout to only 1s.
-func (ip *icmpProxy) Request(ctx context.Context, pk *packet.ICMP, responder *packetResponder) error {
+func (ip *icmpProxy) Request(ctx context.Context, pk *packet.ICMP, responder ICMPResponder) error {
 	defer func() {
 		if r := recover(); r != nil {
 			ip.logger.Error().Interface("error", r).Msgf("Recover panic from sending icmp request/response, error %s", debug.Stack())
 		}
 	}()
 
-	_, requestSpan := responder.requestSpan(ctx, pk)
-	defer responder.exportSpan()
+	_, requestSpan := responder.RequestSpan(ctx, pk)
+	defer responder.ExportSpan()
 
 	echo, err := getICMPEcho(pk.Message)
 	if err != nil {
@@ -290,9 +290,9 @@ func (ip *icmpProxy) Request(ctx context.Context, pk *packet.ICMP, responder *pa
 		return err
 	}
 	tracing.End(requestSpan)
-	responder.exportSpan()
+	responder.ExportSpan()
 
-	_, replySpan := responder.replySpan(ctx, ip.logger)
+	_, replySpan := responder.ReplySpan(ctx, ip.logger)
 	err = ip.handleEchoReply(pk, echo, resp, responder)
 	if err != nil {
 		ip.logger.Err(err).Msg("Failed to send ICMP reply")
@@ -308,7 +308,7 @@ func (ip *icmpProxy) Request(ctx context.Context, pk *packet.ICMP, responder *pa
 	return nil
 }
 
-func (ip *icmpProxy) handleEchoReply(request *packet.ICMP, echoReq *icmp.Echo, resp echoResp, responder *packetResponder) error {
+func (ip *icmpProxy) handleEchoReply(request *packet.ICMP, echoReq *icmp.Echo, resp echoResp, responder ICMPResponder) error {
 	var replyType icmp.Type
 	if request.Dst.Is4() {
 		replyType = ipv4.ICMPTypeEchoReply
