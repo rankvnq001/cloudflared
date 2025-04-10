@@ -1,0 +1,21 @@
+stages: [build]
+
+build_cloudflared:
+  stage: build
+  tags:
+    - "macstadium-${RUNNER_ARCH}"
+  parallel:
+    matrix:
+      - RUNNER_ARCH: [arm, intel]
+  script:
+    - '[ "${RUNNER_ARCH}" = "arm" ] && export TARGET_ARCH=arm64'
+    - '[ "${RUNNER_ARCH}" = "intel" ] && export TARGET_ARCH=amd64'
+    - ARCH=$(uname -m)
+    - echo ARCH=$ARCH - TARGET_ARCH=$TARGET_ARCH
+    - ./.teamcity/mac/install-cloudflare-go.sh
+    - export PATH="/tmp/go/bin:$PATH"
+    - BUILD_SCRIPT=.teamcity/mac/build.sh
+    - if [[ ! -x ${BUILD_SCRIPT} ]] ; then exit ; fi
+    - set -euo pipefail
+    - echo "Executing ${BUILD_SCRIPT}"
+    - exec ${BUILD_SCRIPT}
