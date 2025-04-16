@@ -2,6 +2,31 @@ stages: [build]
 
 build_cloudflared:
   stage: build
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: https://vault.cfdata.org
+  secrets:
+    APPLE_DEV_CA_CERT:
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/apple_dev_ca_cert/data
+      file: false
+    CFD_CODE_SIGN_CERT:
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_cert_v2/data
+      file: false
+    CFD_CODE_SIGN_KEY:
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_key_v2/data
+      file: false
+    CFD_CODE_SIGN_PASS:
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_pass_v2/data
+      file: false
+    CFD_INSTALLER_CERT:
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
+      file: false
+    CFD_INSTALLER_KEY:
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
+      file: false
+    CFD_INSTALLER_PASS:
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
+      file: false
   tags:
     - "macstadium-${RUNNER_ARCH}"
   parallel:
