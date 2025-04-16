@@ -49,7 +49,7 @@ import_certificate() {
       echo -n -e ${CERTIFICATE_ENV_VAR} | base64 -D > ${CERTIFICATE_FILE_NAME}
       # we set || true  here and for every `security import invoke` because the  "duplicate SecKeychainItemImport" error
       # will cause set -e to exit 1. It is okay we do this because we deliberately handle this error in the lines below.
-      local out=$(security import ${CERTIFICATE_FILE_NAME} -A 2>&1) || true
+      local out=$(security import ${CERTIFICATE_FILE_NAME} -T /usr/bin/pkgbuild -A 2>&1) || true
       local exitcode=$?
       # delete the certificate from disk
       rm -rf ${CERTIFICATE_FILE_NAME}
@@ -68,6 +68,23 @@ import_certificate() {
     fi
 }
 
+create_tmp_keychain() {
+  # Reusing the private key password as the keychain key
+  local PRIVATE_KEY_PASS=$1
+
+  # Create temp keychain
+  security create-keychain -p "$PRIVATE_KEY_PASS" tmp_keychain
+
+  # Append temp keychain to the user domain
+  security list-keychains -d user -s tmp_keychain $(security list-keychains -d user | sed s/\"//g)
+
+  # Remove relock timeout
+  security set-keychain-settings tmp_keychain
+
+  security unlock-keychain -p "$PRIVATE_KEY_PASS" tmp_keychain
+
+}
+
 # Imports private keys to the Apple KeyChain
 import_private_keys() {
     local PRIVATE_KEY_NAME=$1
@@ -83,7 +100,7 @@ import_private_keys() {
         echo -n -e ${PRIVATE_KEY_ENV_VAR} | base64 -D > ${PRIVATE_KEY_FILE_NAME}
         # we set || true  here and for every `security import invoke` because the  "duplicate SecKeychainItemImport" error
         # will cause set -e to exit 1. It is okay we do this because we deliberately handle this error in the lines below.
-        local out=$(security import ${PRIVATE_KEY_FILE_NAME} -A -P "${PRIVATE_KEY_PASS}" 2>&1) || true
+        local out=$(security import ${PRIVATE_KEY_FILE_NAME} -k tmp_keychain -P "$PRIVATE_KEY_PASS" -T /usr/bin/pkgbuild -A -P "${PRIVATE_KEY_PASS}" 2>&1) || true
         local exitcode=$?
         rm -rf ${PRIVATE_KEY_FILE_NAME}
         if [ -n "$out" ]; then
@@ -99,6 +116,11 @@ import_private_keys() {
       fi
     fi
 }
+
+
+create_tmp_keychain "${CFD_CODE_SIGN_PASS}"
+
+security list-keychains
 
 # Add Apple Root Developer certificate to the key chain
 import_certificate "Apple Developer CA" "${APPLE_DEV_CA_CERT}" "${APPLE_CA_CERT}"
@@ -119,8 +141,8 @@ import_certificate "Developer ID Installer" "${CFD_INSTALLER_CERT}" "${INSTALLER
 if [[ ! -z "$CFD_CODE_SIGN_NAME" ]]; then
   CODE_SIGN_NAME="${CFD_CODE_SIGN_NAME}"
 else
-  if [[ -n "$(security find-certificate -c "Developer ID Application" | cut -d'"' -f 4 -s | grep "Developer ID Application:" | head -1)" ]]; then
-    CODE_SIGN_NAME=$(security find-certificate -c "Developer ID Application" | cut -d'"' -f 4 -s | grep "Developer ID Application:" | head -1)
+  if [[ -n "$(security find-certificate -c "Developer ID Application" tmp_keychain | cut -d'"' -f 4 -s | grep "Developer ID Application:" | head -1)" ]]; then
+    CODE_SIGN_NAME=$(security find-certificate -c "Developer ID Application" tmp_keychain | cut -d'"' -f 4 -s | grep "Developer ID Application:" | head -1)
   else
     CODE_SIGN_NAME=""
   fi
@@ -130,8 +152,8 @@ fi
 if [[ ! -z "$CFD_INSTALLER_NAME" ]]; then
   PKG_SIGN_NAME="${CFD_INSTALLER_NAME}"
 else
-  if [[ -n "$(security find-certificate -c "Developer ID Installer" | cut -d'"' -f 4 -s | grep "Developer ID Installer:" | head -1)" ]]; then
-    PKG_SIGN_NAME=$(security find-certificate -c "Developer ID Installer" | cut -d'"' -f 4 -s | grep "Developer ID Installer:" | head -1)
+  if [[ -n "$(security find-certificate -c "Developer ID Installer" tmp_keychain | cut -d'"' -f 4 -s | grep "Developer ID Installer:" | head -1)" ]]; then
+    PKG_SIGN_NAME=$(security find-certificate -c "Developer ID Installer" tmp_keychain | cut -d'"' -f 4 -s | grep "Developer ID Installer:" | head -1)
   else
     PKG_SIGN_NAME=""
   fi
@@ -142,9 +164,12 @@ rm -rf "${TARGET_DIRECTORY}"
 export TARGET_OS="darwin"
 GOCACHE="$PWD/../../../../" GOPATH="$PWD/../../../../" CGO_ENABLED=1 make cloudflared
 
+security set-key-partition-list -S apple-tool:,apple: -s -k "${CFD_CODE_SIGN_PASS}" tmp_keychain
+
+
 # sign the cloudflared binary
 if [[ ! -z "$CODE_SIGN_NAME" ]]; then
-  codesign -s "${CODE_SIGN_NAME}" -f -v --timestamp --options runtime ${BINARY_NAME}
+  codesign --keychain /Users/admin/Library/Keychains/tmp_keychain-db -s "${CODE_SIGN_NAME}" -fv --options runtime --timestamp ${BINARY_NAME}
 
  # notarize the binary
  # TODO: TUN-5789
@@ -165,11 +190,13 @@ tar czf "$FILENAME" "${BINARY_NAME}"
 
 # build the installer package
 if [[ ! -z "$PKG_SIGN_NAME" ]]; then
+
   pkgbuild --identifier com.cloudflare.${PRODUCT} \
       --version ${VERSION} \
       --scripts ${ARCH_TARGET_DIRECTORY}/scripts \
       --root ${ARCH_TARGET_DIRECTORY}/contents \
       --install-location /usr/local/bin \
+      --keychain tmp_keychain \
       --sign "${PKG_SIGN_NAME}" \
       ${PKGNAME}
 

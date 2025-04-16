@@ -1,7 +1,32 @@
 stages: [build]
 
-build_cloudflared: &build
+build_cloudflared_macos: &build
   stage: build
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: https://vault.cfdata.org
+  secrets:
+    APPLE_DEV_CA_CERT:
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/apple_dev_ca_cert/data@kv
+      file: false
+    CFD_CODE_SIGN_CERT:
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_cert/data@kv
+      file: false
+    CFD_CODE_SIGN_KEY:
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_key/data@kv
+      file: false
+    CFD_CODE_SIGN_PASS:
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_pass/data@kv
+      file: false
+    CFD_INSTALLER_CERT:
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_cert/data@kv
+      file: false
+    CFD_INSTALLER_KEY:
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_key/data@kv
+      file: false
+    CFD_INSTALLER_PASS:
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_pass/data@kv
+      file: false
   tags:
     - "macstadium-${RUNNER_ARCH}"
   parallel:
@@ -25,7 +50,7 @@ build_cloudflared: &build
     - echo "Executing ${BUILD_SCRIPT}"
     - exec ${BUILD_SCRIPT}
 
-build_cloudflared_tagged_release:
+build_cloudflared_macos_tagged_release:
   <<: *build
   variables:
     ENSURE_TAG: true
@@ -48,10 +73,10 @@ build_cloudflared_tagged_release:
       vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_pass_v2/data
       file: false
     CFD_INSTALLER_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_cert_v2/data
       file: false
     CFD_INSTALLER_KEY:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_key_v2/data
       file: false
     CFD_INSTALLER_PASS:
       vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
