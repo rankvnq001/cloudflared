@@ -1,7 +1,33 @@
 stages: [build]
 
-build_cloudflared:
+build_cloudflared: &build
   stage: build
+  tags:
+    - "macstadium-${RUNNER_ARCH}"
+  parallel:
+    matrix:
+      - RUNNER_ARCH: [arm, intel]
+  script:
+    # When ENSURE_TAG is set, git describe will fail and end the build if there are no tags
+    - if [ "$ENSURE_TAG" = "true" ] ; then echo Checking for tags ... ; git describe --tags ; fi
+    - '[ "${RUNNER_ARCH}" = "arm" ] && export TARGET_ARCH=arm64'
+    - '[ "${RUNNER_ARCH}" = "intel" ] && export TARGET_ARCH=amd64'
+    - ARCH=$(uname -m)
+    - echo ARCH=$ARCH - TARGET_ARCH=$TARGET_ARCH
+    - ./.teamcity/mac/install-cloudflare-go.sh
+    - export PATH="/tmp/go/bin:$PATH"
+    - BUILD_SCRIPT=.teamcity/mac/build.sh
+    - if [[ ! -x ${BUILD_SCRIPT} ]] ; then exit ; fi
+    - set -euo pipefail
+    - echo "Executing ${BUILD_SCRIPT}"
+    - exec ${BUILD_SCRIPT}
+
+build_cloudflared_tagged_release:
+  <<: *build
+  variables:
+    ENSURE_TAG: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
   id_tokens:
     VAULT_ID_TOKEN:
       aud: https://vault.cfdata.org
@@ -27,20 +53,3 @@ build_cloudflared:
     CFD_INSTALLER_PASS:
       vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
       file: false
-  tags:
-    - "macstadium-${RUNNER_ARCH}"
-  parallel:
-    matrix:
-      - RUNNER_ARCH: [arm, intel]
-  script:
-    - '[ "${RUNNER_ARCH}" = "arm" ] && export TARGET_ARCH=arm64'
-    - '[ "${RUNNER_ARCH}" = "intel" ] && export TARGET_ARCH=amd64'
-    - ARCH=$(uname -m)
-    - echo ARCH=$ARCH - TARGET_ARCH=$TARGET_ARCH
-    - ./.teamcity/mac/install-cloudflare-go.sh
-    - export PATH="/tmp/go/bin:$PATH"
-    - BUILD_SCRIPT=.teamcity/mac/build.sh
-    - if [[ ! -x ${BUILD_SCRIPT} ]] ; then exit ; fi
-    - set -euo pipefail
-    - echo "Executing ${BUILD_SCRIPT}"
-    - exec ${BUILD_SCRIPT}
