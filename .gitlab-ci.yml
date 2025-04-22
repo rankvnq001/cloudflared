@@ -7,6 +7,9 @@ build_cloudflared: &build
   parallel:
     matrix:
       - RUNNER_ARCH: [arm, intel]
+  artifacts:
+    paths:
+      - artifacts/*
   script:
     # When ENSURE_TAG is set, git describe will fail and end the build if there are no tags
     - if [ "$ENSURE_TAG" = "true" ] ; then echo Checking for tags ... ; git describe --tags ; fi
