@@ -25,6 +25,33 @@ check_tag:
 
 build_cloudflared_macos: &build
   stage: build
+  rules:
+    - when: never
+  tags:
+    - "macstadium-${RUNNER_ARCH}"
+  parallel:
+    matrix:
+      - RUNNER_ARCH: [arm, intel]
+  artifacts:
+    paths:
+      - artifacts/*
+  script:
+    - '[ "${RUNNER_ARCH}" = "arm" ] && export TARGET_ARCH=arm64'
+    - '[ "${RUNNER_ARCH}" = "intel" ] && export TARGET_ARCH=amd64'
+    - ARCH=$(uname -m)
+    - echo ARCH=$ARCH - TARGET_ARCH=$TARGET_ARCH
+    - ./.teamcity/mac/install-cloudflare-go.sh
+    - export PATH="/tmp/go/bin:$PATH"
+    - BUILD_SCRIPT=.teamcity/mac/build.sh
+    - if [[ ! -x ${BUILD_SCRIPT} ]] ; then exit ; fi
+    - set -euo pipefail
+    - echo "Executing ${BUILD_SCRIPT}"
+    - exec ${BUILD_SCRIPT}
+
+build_and_sign_cloudflared_macos:
+  <<: *build
+  rules:
+    - when: always
   secrets:
     APPLE_DEV_CA_CERT:
       vault: gitlab/cloudflare/tun/cloudflared/_dev/apple_dev_ca_cert/data@kv
@@ -47,32 +74,13 @@ build_cloudflared_macos: &build
     CFD_INSTALLER_PASS:
       vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_pass/data@kv
       file: false
-  tags:
-    - "macstadium-${RUNNER_ARCH}"
-  parallel:
-    matrix:
-      - RUNNER_ARCH: [arm, intel]
-  artifacts:
-    paths:
-      - artifacts/*
-  script:
-    - '[ "${RUNNER_ARCH}" = "arm" ] && export TARGET_ARCH=arm64'
-    - '[ "${RUNNER_ARCH}" = "intel" ] && export TARGET_ARCH=amd64'
-    - ARCH=$(uname -m)
-    - echo ARCH=$ARCH - TARGET_ARCH=$TARGET_ARCH
-    - ./.teamcity/mac/install-cloudflare-go.sh
-    - export PATH="/tmp/go/bin:$PATH"
-    - BUILD_SCRIPT=.teamcity/mac/build.sh
-    - if [[ ! -x ${BUILD_SCRIPT} ]] ; then exit ; fi
-    - set -euo pipefail
-    - echo "Executing ${BUILD_SCRIPT}"
-    - exec ${BUILD_SCRIPT}
 
-build_cloudflared_macos_tagged_release:
-  stage: build
-  image: docker-registry.cfdata.org/stash/cf/debian-images/bookworm/main:302-326550a62d5c@sha256:c8257b4e523f34b4ae6c6816d7685a39eabe0bd8c8bccb2c5befbacaed47f911
+release_cloudflared_macos_to_github:
+  stage: release
+  image: docker-registry.cfdata.org/stash/tun/docker-images/cloudflared-ci/main:5-0e9d27aca53f@sha256:dc41355345c593357fd0a2a70a8ff3d62ddadafe4be03dbfae4b883bfd477be1
   dependencies:
     - check_tag
+    - build_and_sign_cloudflared_macos
   cache:
     paths:
       - .cache/pip
@@ -88,16 +96,13 @@ build_cloudflared_macos_tagged_release:
       vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_github_api_key/data@kv
       file: false
   before_script:
-    - apt-get update && apt-get install -y go-boring=1.22.10-1 build-essential python3-dev libffi-dev python3-setuptools python3-pip python3-venv
     - python3 --version ; pip --version  # For debugging
-    - pip install virtualenv
-    - /home/gitlab-runner/.local/bin/virtualenv venv
+    - python3 -m venv venv
     - source venv/bin/activate
     - pip install pynacl==1.4.0 pygithub==1.55
   script:
-    - ls -lrth
     - echo $VERSION
     - echo $TAG_EXISTS
     - echo "Running release because tag exists."
-    - python3 github_release.py --path artifacts/ --release-version $VERSION --draft --dry-run
-
+    - python3 github_release.py --path artifacts/ --release-version $VERSION --draft
+    - echo "Running release_cloudflared_macos_to_github"

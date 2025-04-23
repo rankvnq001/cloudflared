@@ -72,8 +72,12 @@ create_cloudflared_build_keychain() {
   # Reusing the private key password as the keychain key
   local PRIVATE_KEY_PASS=$1
 
-  # Create temp keychain
-  security create-keychain -p "$PRIVATE_KEY_PASS" cloudflared_build_keychain
+  # Create keychain only if it doesn't already exist
+  if [ ! -f "$HOME/Library/Keychains/cloudflared_build_keychain.keychain-db" ]; then
+    security create-keychain -p "$PRIVATE_KEY_PASS" cloudflared_build_keychain
+  else
+    echo "Keychain already exists: cloudflared_build_keychain"
+  fi
 
   # Append temp keychain to the user domain
   security list-keychains -d user -s cloudflared_build_keychain $(security list-keychains -d user | sed s/\"//g)

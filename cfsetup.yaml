@@ -231,6 +231,21 @@ bullseye: &bullseye
       - . env/bin/activate
       - pip install pynacl==1.4.0 pygithub==1.55
       - make github-release
+  macos-release:
+    build_dir: *build_dir
+    builddeps:
+      - *pinned_go
+      - build-essential
+      - python3-dev
+      - libffi-dev
+      - python3-setuptools
+      - python3-pip
+      - python3-venv
+    post-cache:
+      - python3 -m venv env
+      - . env/bin/activate
+      - pip install pynacl==1.4.0 pygithub==1.55
+      - make macos-release
   r2-linux-release:
     build_dir: *build_dir
     builddeps:
