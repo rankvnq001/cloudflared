@@ -201,9 +201,9 @@ def upload_asset(release, filepath, filename, release_version, kv_account_id, na
         binary_path = os.path.join(os.getcwd(), 'cfd', 'cloudflared')
 
     # send the sha256 (the checksum) to workers kv
-    logging.info("Uploading sha256 checksum for: %s", filename)
-    pkg_hash = get_sha256(binary_path)
-    send_hash(pkg_hash, filename, release_version, kv_account_id, namespace_id, kv_api_token)
+   # logging.info("Uploading sha256 checksum for: %s", filename)
+   # pkg_hash = get_sha256(binary_path)
+    #send_hash(pkg_hash, filename, release_version, kv_account_id, namespace_id, kv_api_token)
 
 def move_asset(filepath, filename):
     # create the artifacts directory if it doesn't exist
