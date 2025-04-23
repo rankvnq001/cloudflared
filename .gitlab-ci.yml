@@ -15,6 +15,7 @@ check_tag:
       # Check if there is a Git tag pointing to HEAD
       if git tag --points-at HEAD | grep .; then
         echo "TAG_EXISTS=true" >> tag_check.env
+        echo "VERSION=$(git tag --points-at HEAD | grep .)" >> tag_check.env
       else
         echo "TAG_EXISTS=false" >> tag_check.env
       fi
@@ -68,8 +69,11 @@ build_cloudflared_macos: &build
     - exec ${BUILD_SCRIPT}
 
 build_cloudflared_macos_tagged_release:
-  stage: build
+  stage: release
   image: docker-registry.cfdata.org/stash/devtools/ci-builders/python3.11/master:2917-0943e356eb01@sha256:a2780322e1926273ade752ae0c936876b9bef388d43b866347d6b2acd982d7e8
+  dependencies:
+    - check_tag
+    - build_cloudflared_macos
   cache:
     paths:
       - .cache/pip
@@ -89,7 +93,11 @@ build_cloudflared_macos_tagged_release:
     - pip install virtualenv
     - /home/gitlab-runner/.local/bin/virtualenv venv
     - source venv/bin/activate
+    - pip install pynacl==1.4.0 pygithub==1.55
   script:
+    - ls -lrth
+    - echo $VERSION
+    - echo $TAG_EXISTS
     - echo "Running release because tag exists."
-    - python3 github_release.py --path $(PWD)/artifacts --release-version $(VERSION) --draft --dry-run
+    - python3 github_release.py --path artifacts/ --release-version $VERSION --draft --dry-run
 
