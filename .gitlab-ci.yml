@@ -69,7 +69,7 @@ build_cloudflared_macos: &build
 
 build_cloudflared_macos_tagged_release:
   stage: build
-  image: python:latest
+  image: docker-registry.cfdata.org/stash/devtools/ci-builders/python3.11/master:2917-0943e356eb01@sha256:a2780322e1926273ade752ae0c936876b9bef388d43b866347d6b2acd982d7e8
   cache:
     paths:
       - .cache/pip
@@ -85,12 +85,11 @@ build_cloudflared_macos_tagged_release:
       vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_github_api_key/data@kv
       file: false
   before_script:
-    - python --version ; pip --version  # For debugging
+    - python3 --version ; pip --version  # For debugging
     - pip install virtualenv
-    - virtualenv venv
+    - /home/gitlab-runner/.local/bin/virtualenv venv
     - source venv/bin/activate
   script:
     - echo "Running release because tag exists."
-    - ls -lrth artifacts/
     - python3 github_release.py --path $(PWD)/artifacts --release-version $(VERSION) --draft --dry-run
 
