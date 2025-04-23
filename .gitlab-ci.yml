@@ -1,4 +1,21 @@
-stages: [build]
+stages: [check, build, release]
+
+# -----------------------------------------------
+# Stage 1: Check for a Git tag on the current commit
+# -----------------------------------------------
+check_tag:
+  stage: check
+  script:
+    - |
+      # Check if there is a Git tag pointing to HEAD
+      if git tag --points-at HEAD | grep .; then
+        echo "TAG_EXISTS=true" >> tag_check.env
+      else
+        echo "TAG_EXISTS=false" >> tag_check.env
+      fi
+  artifacts:
+    reports:
+      dotenv: tag_check.env  # Pass the TAG_EXISTS variable to the next stage
 
 build_cloudflared_macos: &build
   stage: build
@@ -36,8 +53,6 @@ build_cloudflared_macos: &build
     paths:
       - artifacts/*
   script:
-    # When ENSURE_TAG is set, git describe will fail and end the build if there are no tags
-    - if [ "$ENSURE_TAG" = "true" ] ; then echo Checking for tags ... ; git describe --tags ; fi
     - '[ "${RUNNER_ARCH}" = "arm" ] && export TARGET_ARCH=arm64'
     - '[ "${RUNNER_ARCH}" = "intel" ] && export TARGET_ARCH=amd64'
     - ARCH=$(uname -m)
@@ -51,33 +66,10 @@ build_cloudflared_macos: &build
     - exec ${BUILD_SCRIPT}
 
 build_cloudflared_macos_tagged_release:
-  <<: *build
-  variables:
-    ENSURE_TAG: true
-  rules:
-    - if: $CI_COMMIT_BRANCH == "master"
-  id_tokens:
-    VAULT_ID_TOKEN:
-      aud: https://vault.cfdata.org
-  secrets:
-    APPLE_DEV_CA_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/apple_dev_ca_cert/data
-      file: false
-    CFD_CODE_SIGN_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_cert_v2/data
-      file: false
-    CFD_CODE_SIGN_KEY:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_key_v2/data
-      file: false
-    CFD_CODE_SIGN_PASS:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_pass_v2/data
-      file: false
-    CFD_INSTALLER_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_cert_v2/data
-      file: false
-    CFD_INSTALLER_KEY:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_key_v2/data
-      file: false
-    CFD_INSTALLER_PASS:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
-      file: false
+  stage: release
+  dependencies:
+    - build_cloudflared_macos
+  script:
+    - echo "Running build because tag exists."
+    - ls -lrth artifacts/
+
