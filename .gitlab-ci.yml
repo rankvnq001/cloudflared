@@ -68,10 +68,13 @@ build_cloudflared_macos: &build
     - exec ${BUILD_SCRIPT}
 
 build_cloudflared_macos_tagged_release:
-  stage: release
-  dependencies:
-    - build_cloudflared_macos
+  stage: build
+  image: python:latest
+  cache:
+    paths:
+      - .cache/pip
   variables:
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
     KV_NAMESPACE: 380e19aa04314648949b6ad841417ebe
     KV_ACCOUNT: 5ab4e9dfbd435d24068829fda0077963
   secrets:
@@ -81,8 +84,13 @@ build_cloudflared_macos_tagged_release:
     API_KEY:
       vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_github_api_key/data@kv
       file: false
+  before_script:
+    - python --version ; pip --version  # For debugging
+    - pip install virtualenv
+    - virtualenv venv
+    - source venv/bin/activate
   script:
     - echo "Running release because tag exists."
     - ls -lrth artifacts/
-    - python3 github_release.py --path $(PWD)/artifacts --release-version $(VERSION) --draft
+    - python3 github_release.py --path $(PWD)/artifacts --release-version $(VERSION) --draft --dry-run
 
