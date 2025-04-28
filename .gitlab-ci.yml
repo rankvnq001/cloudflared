@@ -32,6 +32,8 @@ build_cloudflared_macos: &build
     - if: '$CI_COMMIT_BRANCH != "master"'
       when: always
     - when: never
+  dependencies:
+    - check_tag
   tags:
     - "macstadium-${RUNNER_ARCH}"
   parallel:
@@ -62,6 +64,8 @@ build_and_sign_cloudflared_macos:
     - if: '$CI_COMMIT_BRANCH == "master" && $TAG_EXISTS == "true"'
       when: always
     - when: never
+  dependencies:
+    - check_tag
   secrets:
     APPLE_DEV_CA_CERT:
       vault: gitlab/cloudflare/tun/cloudflared/_branch/master/apple_dev_ca_cert/data
@@ -94,6 +98,10 @@ release_cloudflared_macos_to_github:
   dependencies:
     - check_tag
     - build_and_sign_cloudflared_macos
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master" && $TAG_EXISTS == "true"'
+      when: always
+    - when: never
   cache:
     paths:
       - .cache/pip
