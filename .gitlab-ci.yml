@@ -23,9 +23,14 @@ check_tag:
     reports:
       dotenv: tag_check.env  # Pass the TAG_EXISTS variable to the next stage
 
+# -----------------------------------------------
+# Stage 2: Build on every PR
+# -----------------------------------------------
 build_cloudflared_macos: &build
   stage: build
   rules:
+    - if: '$CI_COMMIT_BRANCH != "master"'
+      when: always
     - when: never
   tags:
     - "macstadium-${RUNNER_ARCH}"
@@ -48,33 +53,41 @@ build_cloudflared_macos: &build
     - echo "Executing ${BUILD_SCRIPT}"
     - exec ${BUILD_SCRIPT}
 
+# -----------------------------------------------
+# Stage 2: Build and sign only on releases
+# -----------------------------------------------
 build_and_sign_cloudflared_macos:
   <<: *build
   rules:
-    - when: always
+    - if: '$CI_COMMIT_BRANCH == "master" && $TAG_EXISTS == "true"'
+      when: always
+    - when: never
   secrets:
     APPLE_DEV_CA_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_dev/apple_dev_ca_cert/data@kv
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/apple_dev_ca_cert/data
       file: false
     CFD_CODE_SIGN_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_cert/data@kv
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_cert_v2/data
       file: false
     CFD_CODE_SIGN_KEY:
-      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_key/data@kv
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_key_v2/data
       file: false
     CFD_CODE_SIGN_PASS:
-      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_pass/data@kv
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_pass_v2/data
       file: false
     CFD_INSTALLER_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_cert/data@kv
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_cert_v2/data
       file: false
     CFD_INSTALLER_KEY:
-      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_key/data@kv
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_key_v2/data
       file: false
     CFD_INSTALLER_PASS:
-      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_pass/data@kv
+      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
       file: false
 
+# -----------------------------------------------
+# Stage 3: Release to Github after building and signing
+# -----------------------------------------------
 release_cloudflared_macos_to_github:
   stage: release
   image: docker-registry.cfdata.org/stash/tun/docker-images/cloudflared-ci/main:5-0e9d27aca53f@sha256:dc41355345c593357fd0a2a70a8ff3d62ddadafe4be03dbfae4b883bfd477be1
@@ -104,5 +117,5 @@ release_cloudflared_macos_to_github:
     - echo $VERSION
     - echo $TAG_EXISTS
     - echo "Running release because tag exists."
-    - python3 github_release.py --path artifacts/ --release-version $VERSION --draft
+    - python3 github_release.py --path artifacts/ --release-version $VERSION
     - echo "Running release_cloudflared_macos_to_github"
