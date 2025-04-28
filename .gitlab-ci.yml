@@ -10,6 +10,8 @@ default:
 # -----------------------------------------------
 check_tag:
   stage: check
+  rules:
+      - when: always
   script:
     - |
       # Check if there is a Git tag pointing to HEAD
