@@ -57,6 +57,9 @@ def send_hash(pkg_hash, name, version, account, namespace, api_token):
 def assert_tag_exists(repo, version):
     """ Raise exception if repo does not contain a tag matching version """
     tags = repo.get_tags()
+    for tag in tags:
+        print(tag)
+        print(tag.name)
     if not tags or tags[0].name != version:
         raise Exception("Tag {} not found".format(version))
 

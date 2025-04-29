@@ -5,25 +5,18 @@ default:
     VAULT_ID_TOKEN:
       aud: https://vault.cfdata.org
 
-# -----------------------------------------------
-# Stage 1: Check for a Git tag on the current commit
-# -----------------------------------------------
-check_tag:
-  stage: check
-  rules:
-      - when: always
-  script:
+.check_tag:
+  before_script:
     - |
       # Check if there is a Git tag pointing to HEAD
+      echo "Tag found: $(git tag --points-at HEAD | grep .)"
       if git tag --points-at HEAD | grep .; then
-        echo "TAG_EXISTS=true" >> tag_check.env
-        echo "VERSION=$(git tag --points-at HEAD | grep .)" >> tag_check.env
+        echo "Tag found: $(git tag --points-at HEAD | grep .)"
+        export "VERSION=$(git tag --points-at HEAD | grep .)"
       else
-        echo "TAG_EXISTS=false" >> tag_check.env
+        echo "No tag present — skipping."
+        exit 0
       fi
-  artifacts:
-    reports:
-      dotenv: tag_check.env  # Pass the TAG_EXISTS variable to the next stage
 
 # -----------------------------------------------
 # Stage 2: Build on every PR
@@ -31,11 +24,7 @@ check_tag:
 build_cloudflared_macos: &build
   stage: build
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
     - when: never
-  dependencies:
-    - check_tag
   tags:
     - "macstadium-${RUNNER_ARCH}"
   parallel:
@@ -62,33 +51,32 @@ build_cloudflared_macos: &build
 # -----------------------------------------------
 build_and_sign_cloudflared_macos:
   <<: *build
+  extends: .check_tag
   rules:
-    - if: '$CI_COMMIT_BRANCH == "master" && $TAG_EXISTS == "true"'
+    - if: $CI_COMMIT_BRANCH == "ggarcia/larry/gitlab-plus-macstadium-release-test"
       when: always
     - when: never
-  dependencies:
-    - check_tag
   secrets:
     APPLE_DEV_CA_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/apple_dev_ca_cert/data
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/apple_dev_ca_cert/data@kv
       file: false
     CFD_CODE_SIGN_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_cert_v2/data
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_cert/data@kv
       file: false
     CFD_CODE_SIGN_KEY:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_key_v2/data
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_key/data@kv
       file: false
     CFD_CODE_SIGN_PASS:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_code_sign_pass_v2/data
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_codesign_pass/data@kv
       file: false
     CFD_INSTALLER_CERT:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_cert_v2/data
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_cert/data@kv
       file: false
     CFD_INSTALLER_KEY:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_key_v2/data
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_key/data@kv
       file: false
     CFD_INSTALLER_PASS:
-      vault: gitlab/cloudflare/tun/cloudflared/_branch/master/cfd_installer_pass_v2/data
+      vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_installer_pass/data@kv
       file: false
 
 # -----------------------------------------------
@@ -97,11 +85,11 @@ build_and_sign_cloudflared_macos:
 release_cloudflared_macos_to_github:
   stage: release
   image: docker-registry.cfdata.org/stash/tun/docker-images/cloudflared-ci/main:6-8616fe631b76-amd64@sha256:96f4fd05e66cec03e0864c1bcf09324c130d4728eef45ee994716da499183614
+  extends: .check_tag
   dependencies:
-    - check_tag
     - build_and_sign_cloudflared_macos
   rules:
-    - if: '$CI_COMMIT_BRANCH == "master" && $TAG_EXISTS == "true"'
+    - if: $CI_COMMIT_BRANCH == "ggarcia/larry/gitlab-plus-macstadium-release-test"
       when: always
     - when: never
   cache:
@@ -118,12 +106,11 @@ release_cloudflared_macos_to_github:
     API_KEY:
       vault: gitlab/cloudflare/tun/cloudflared/_dev/cfd_github_api_key/data@kv
       file: false
-  before_script:
+  script:
     - python3 --version ; pip --version  # For debugging
     - python3 -m venv venv
     - source venv/bin/activate
     - pip install pynacl==1.4.0 pygithub==1.55
-  script:
     - echo $VERSION
     - echo $TAG_EXISTS
     - echo "Running release because tag exists."

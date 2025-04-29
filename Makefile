@@ -239,7 +239,7 @@ github-release:
 
 .PHONY: macos-release
 macos-release:
-	- python3 github_release.py --path $(PWD)/artifacts/ --release-version $(VERSION)
+	- python3 github_release.py --path $(PWD)/artifacts/ --release-version $(VERSION) --draft
 
 .PHONY: r2-linux-release
 r2-linux-release:
