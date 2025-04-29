@@ -167,9 +167,12 @@ rm -rf "${TARGET_DIRECTORY}"
 export TARGET_OS="darwin"
 GOCACHE="$PWD/../../../../" GOPATH="$PWD/../../../../" CGO_ENABLED=1 make cloudflared
 
+
 # This allows apple tools to use the certificates in the keychain without requiring password input.
 # This command always needs to run after the certificates have been loaded into the keychain
-security set-key-partition-list -S apple-tool:,apple: -s -k "${CFD_CODE_SIGN_PASS}" cloudflared_build_keychain
+if [[ ! -z "$CFD_CODE_SIGN_PASS" ]]; then
+  security set-key-partition-list -S apple-tool:,apple: -s -k "${CFD_CODE_SIGN_PASS}" cloudflared_build_keychain
+fi
 
 # sign the cloudflared binary
 if [[ ! -z "$CODE_SIGN_NAME" ]]; then

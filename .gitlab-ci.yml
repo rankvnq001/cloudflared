@@ -31,7 +31,7 @@ check_tag:
 build_cloudflared_macos: &build
   stage: build
   rules:
-    - if: '$CI_COMMIT_BRANCH != "master"'
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: always
     - when: never
   dependencies:
