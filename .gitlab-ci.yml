@@ -96,7 +96,7 @@ build_and_sign_cloudflared_macos:
 # -----------------------------------------------
 release_cloudflared_macos_to_github:
   stage: release
-  image: docker-registry.cfdata.org/stash/tun/docker-images/cloudflared-ci/main:5-0e9d27aca53f@sha256:dc41355345c593357fd0a2a70a8ff3d62ddadafe4be03dbfae4b883bfd477be1
+  image: docker-registry.cfdata.org/stash/tun/docker-images/cloudflared-ci/main:6-8616fe631b76-amd64@sha256:96f4fd05e66cec03e0864c1bcf09324c130d4728eef45ee994716da499183614
   dependencies:
     - check_tag
     - build_and_sign_cloudflared_macos
@@ -127,5 +127,4 @@ release_cloudflared_macos_to_github:
     - echo $VERSION
     - echo $TAG_EXISTS
     - echo "Running release because tag exists."
-    - python3 github_release.py --path artifacts/ --release-version $VERSION
-    - echo "Running release_cloudflared_macos_to_github"
+    - make macos-release
