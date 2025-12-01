@@ -2,7 +2,8 @@
 name: "\U0001F41B Bug report"
 about: Create a report to help us improve cloudflared
 title: "\U0001F41B"
-labels: 'Priority: Normal, Type: Bug'
+labels: ''
+assignees: ''
 
 ---
 
